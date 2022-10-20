@@ -18,6 +18,11 @@ async function setup() {
 		await createBucketWebsiteHosting(DIR);
 
 		// TODO: setup domain on cloudflare
+		// 1. create zones on cloudflare
+		// 2. add records
+		// 3. setup www. forwarding rule
+		// 4. setup ssl to flexible
+		// 5. setup always redirect to https
 	} catch (err) {
 		console.log(err.message);
 	}
@@ -43,5 +48,3 @@ async function deploy() {
 		console.log(err.message);
 	}
 }
-
-function removeHtmlExtension() {}

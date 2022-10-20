@@ -1,7 +1,6 @@
 import { S3Client, CreateBucketCommand, PutBucketWebsiteCommand, PutObjectCommand, DeleteBucketCommand, ListObjectsCommand, DeleteObjectsCommand } from '@aws-sdk/client-s3';
 
-const AWS_REGION = 'eu-central-1';
-const client = new S3Client({ region: AWS_REGION });
+const client = new S3Client({ region: 'eu-central-1' });
 
 export function createBucket(name) {
 	const command = new CreateBucketCommand({
