@@ -5,9 +5,10 @@ import mime from 'mime';
 import fastGlob from 'fast-glob';
 import { upsertZone, upsertRecord, alwaysUseHttps, changeSSLSetting, createHiddenDir, getCloudflareKeysFile, saveCloudflareKeysFile, setupClient, addPageRule } from './cloudflare.js';
 import inquirer from 'inquirer';
+import path from 'path';
 
 const AWS_REGION = 'eu-central-1';
-const DIR = process.cwd().slice(process.cwd().lastIndexOf('/') + 1);
+const DIR = path.basename(process.cwd());
 const BUCKET_DOMAIN = `${DIR}.s3-website.${AWS_REGION}.amazonaws.com`;
 
 async function setup() {
