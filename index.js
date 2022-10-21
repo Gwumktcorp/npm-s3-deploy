@@ -89,7 +89,7 @@ async function setupCloudflare(token) {
 async function setupCloudflareAuth() {
 	const { name, token } = await inquirer.prompt([
 		{ type: 'input', name: 'name', message: 'Account name' },
-		{ type: 'password', name: 'token', message: 'Token' },
+		{ type: 'input', name: 'token', message: 'Token' },
 	]);
 
 	await createHiddenDir();
