@@ -1,9 +1,7 @@
 import Cloudflare from 'cloudflare';
 import fs from 'node:fs/promises';
-import os from 'node:os';
 import path from 'path';
-
-const HOME_DIR = os.homedir();
+import { HOME_DIR } from './utils.js';
 
 let client = new Cloudflare();
 
@@ -75,10 +73,6 @@ export async function getCloudflareKeysFile() {
 
 export async function saveCloudflareKeysFile(data) {
 	await fs.writeFile(path.join(HOME_DIR, '.cloudflare/keys.json'), JSON.stringify(data));
-}
-
-export async function createHiddenDir() {
-	await fs.mkdir(path.join(HOME_DIR, '.cloudflare')).catch(() => {});
 }
 
 export function addPageRule(zoneId, name) {

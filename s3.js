@@ -1,6 +1,23 @@
 import { S3Client, CreateBucketCommand, PutBucketWebsiteCommand, PutObjectCommand, DeleteBucketCommand, ListObjectsV2Command, DeleteObjectsCommand } from '@aws-sdk/client-s3';
+import fs from 'node:fs/promises';
+import path from 'path';
+import { HOME_DIR } from './utils.js';
 
-const client = new S3Client({ region: 'eu-central-1' });
+let client = new S3Client({
+	region: 'eu-central-1',
+	credentials: {
+		accessKeyId: 'xxx',
+		secretAccessKey: 'xxx',
+	},
+});
+
+export async function setupClient() {
+	const keys = await getAWSKeysFile();
+	client = new S3Client({
+		region: 'eu-central-1',
+		credentials: keys,
+	});
+}
 
 export function createBucket(name) {
 	const command = new CreateBucketCommand({
@@ -81,4 +98,13 @@ export async function deleteBucket({ name, force = false }) {
 		Bucket: name,
 	});
 	return client.send(command);
+}
+
+export async function getAWSKeysFile() {
+	const file = await fs.readFile(path.join(HOME_DIR, '.aws/keys.json')).catch(() => {});
+	return file ? JSON.parse(file) : {};
+}
+
+export async function saveAWSKeysFile(data) {
+	await fs.writeFile(path.join(HOME_DIR, '.aws/keys.json'), JSON.stringify(data));
 }

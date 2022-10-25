@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 import fs from 'node:fs/promises';
-import { createBucket, createBucketWebsiteHosting, addFileToBucket, emptyBucket } from './s3.js';
+import { createBucket, createBucketWebsiteHosting, addFileToBucket, emptyBucket, saveAWSKeysFile, setupClient as setupAWSClient } from './s3.js';
 import mime from 'mime';
 import fastGlob from 'fast-glob';
-import { upsertZone, upsertRecord, alwaysUseHttps, changeSSLSetting, createHiddenDir, getCloudflareKeysFile, saveCloudflareKeysFile, setupClient, addPageRule } from './cloudflare.js';
+import { upsertZone, upsertRecord, alwaysUseHttps, changeSSLSetting, getCloudflareKeysFile, saveCloudflareKeysFile, setupClient as setupCloudflareClient, addPageRule } from './cloudflare.js';
 import inquirer from 'inquirer';
 import path from 'path';
+import { createHiddenDir } from './utils.js';
 
 const AWS_REGION = 'eu-central-1';
 const DIR = path.basename(process.cwd());
@@ -56,6 +57,8 @@ async function chooseCloudflareAccount() {
 }
 
 async function deploy() {
+	await setupAWSClient();
+
 	try {
 		const { pathInput } = await inquirer.prompt({
 			type: 'input',
@@ -89,6 +92,8 @@ async function deploy() {
 }
 
 async function setupAWSBucket() {
+	await setupAWSClient();
+
 	console.log('setting aws bucket');
 	await createBucket(DIR);
 	await createBucketWebsiteHosting(DIR);
@@ -98,7 +103,7 @@ async function setupCloudflare() {
 	const { cloudflareToken } = await chooseCloudflareAccount();
 
 	console.log('setting cloudflare');
-	setupClient(cloudflareToken);
+	setupCloudflareClient(cloudflareToken);
 	try {
 		const zone = await upsertZone(DIR);
 		if (!zone) throw new Error('Zone is not exists');
@@ -121,11 +126,23 @@ async function setupCloudflareAuth() {
 		{ type: 'input', name: 'token', message: 'Token' },
 	]);
 
-	await createHiddenDir();
+	await createHiddenDir('.cloudflare');
 
 	const keys = await getCloudflareKeysFile();
 	Object.assign(keys, { [name]: token });
 	await saveCloudflareKeysFile(keys);
+}
+
+async function setupAWSAuth() {
+	const { accessKeyId, secretAccessKey } = await inquirer.prompt([
+		{ type: 'input', name: 'accessKeyId', message: 'Access Key ID' },
+		{ type: 'input', name: 'secretAccessKey', message: 'Secret Access Key' },
+	]);
+
+	await createHiddenDir('.aws');
+
+	const keys = { accessKeyId, secretAccessKey };
+	await saveAWSKeysFile(keys);
 }
 
 async function main() {
@@ -146,6 +163,10 @@ async function main() {
 				{
 					name: 'Setup Cloudflare auth',
 					value: setupCloudflareAuth,
+				},
+				{
+					name: 'Setup AWS auth',
+					value: setupAWSAuth,
 				},
 			],
 		},
