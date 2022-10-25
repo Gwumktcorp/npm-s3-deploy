@@ -1,4 +1,4 @@
-import { S3Client, CreateBucketCommand, PutBucketWebsiteCommand, PutObjectCommand, DeleteBucketCommand, ListObjectsCommand, DeleteObjectsCommand } from '@aws-sdk/client-s3';
+import { S3Client, CreateBucketCommand, PutBucketWebsiteCommand, PutObjectCommand, DeleteBucketCommand, ListObjectsV2Command, DeleteObjectsCommand } from '@aws-sdk/client-s3';
 
 const client = new S3Client({ region: 'eu-central-1' });
 
@@ -33,25 +33,44 @@ export function addFileToBucket({ bucketName, fileName, fileData, contentType })
 	return client.send(command);
 }
 
-function listBucketObjects(name) {
-	const command = new ListObjectsCommand({
+function listBucketObjects(name, token) {
+	const command = new ListObjectsV2Command({
 		Bucket: name,
+		ContinuationToken: token,
 	});
 	return client.send(command);
 }
 
-export async function emptyBucket(name) {
-	const bucketObjects = await listBucketObjects(name);
-	if (!bucketObjects?.Contents) return;
+async function listAllBucketObjectsInChunks(name, items = [], token) {
+	const response = await listBucketObjects(name, token);
+	let objects = [...items];
+	if (response?.Contents?.length) {
+		objects.push(response.Contents);
+	}
+	if (response.NextContinuationToken) {
+		return listAllBucketObjectsInChunks(name, objects, response.NextContinuationToken);
+	}
 
-	const Objects = bucketObjects.Contents.map(item => ({ Key: item.Key }));
-	const command = new DeleteObjectsCommand({
-		Bucket: name,
-		Delete: {
-			Objects: Objects,
-		},
-	});
-	return client.send(command);
+	return objects;
+}
+
+export async function emptyBucket(name) {
+	const bucketObjectsChunks = await listAllBucketObjectsInChunks(name);
+
+	const promises = [];
+	for (let i = 0; i < bucketObjectsChunks.length; i++) {
+		const bucketObjects = bucketObjectsChunks[i];
+
+		const command = new DeleteObjectsCommand({
+			Bucket: name,
+			Delete: {
+				Objects: bucketObjects.map(item => ({ Key: item.Key })),
+			},
+		});
+		promises.push(client.send(command));
+	}
+
+	return Promise.all(promises);
 }
 
 export async function deleteBucket({ name, force = false }) {

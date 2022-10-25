@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import fs from 'node:fs/promises';
-import { createBucket, createBucketWebsiteHosting, addFileToBucket } from './s3.js';
+import { createBucket, createBucketWebsiteHosting, addFileToBucket, emptyBucket } from './s3.js';
 import mime from 'mime';
 import fastGlob from 'fast-glob';
 import { upsertZone, upsertRecord, alwaysUseHttps, changeSSLSetting, createHiddenDir, getCloudflareKeysFile, saveCloudflareKeysFile, setupClient, addPageRule } from './cloudflare.js';
@@ -12,13 +12,28 @@ const DIR = path.basename(process.cwd());
 const BUCKET_DOMAIN = `${DIR}.s3-website.${AWS_REGION}.amazonaws.com`;
 
 async function setup() {
-	const { cloudflareToken } = await chooseCloudflareAccount();
+	const { actions } = await inquirer.prompt({
+		type: 'checkbox',
+		name: 'actions',
+		message: 'Select actions',
+		choices: [
+			{
+				name: 'Setup Cloudflare domain',
+				value: setupCloudflare,
+				checked: true,
+			},
+			{
+				name: 'Setup AWS Bucket',
+				value: setupAWSBucket,
+				checked: true,
+			},
+		],
+	});
 
 	try {
-		await Promise.all([
-			setupAWSBucket(), //
-			setupCloudflare(cloudflareToken),
-		]);
+		for (const fn of actions) {
+			await fn();
+		}
 	} catch (err) {
 		console.log(err.message);
 	}
@@ -42,10 +57,22 @@ async function chooseCloudflareAccount() {
 
 async function deploy() {
 	try {
-		const files = await fastGlob('**', { absolute: false });
+		const { pathInput } = await inquirer.prompt({
+			type: 'input',
+			name: 'pathInput',
+			message: 'Path',
+			default: '/',
+		});
+
+		const files = await fastGlob(`./${pathInput}/**`);
 		const filesData = await Promise.all(files.map(path => fs.readFile(path)));
+		await emptyBucket(DIR);
+
 		const promises = files.map(async (filePath, i) => {
 			const fileData = filesData[i];
+			if (pathInput !== '/') {
+				filePath = filePath.slice(filePath.indexOf(pathInput) + pathInput.length + 1);
+			}
 			await addFileToBucket({
 				bucketName: DIR,
 				fileName: filePath,
@@ -55,7 +82,7 @@ async function deploy() {
 			console.log(`added ${filePath}`);
 		});
 		await Promise.all(promises);
-		console.log(`BUCKET DOMAIN: http://${BUCKET_DOMAIN}`);
+		console.log(`\n ✅ BUCKET DOMAIN: http://${BUCKET_DOMAIN}`);
 	} catch (err) {
 		console.log(err.message);
 	}
@@ -67,9 +94,11 @@ async function setupAWSBucket() {
 	await createBucketWebsiteHosting(DIR);
 }
 
-async function setupCloudflare(token) {
+async function setupCloudflare() {
+	const { cloudflareToken } = await chooseCloudflareAccount();
+
 	console.log('setting cloudflare');
-	setupClient(token);
+	setupClient(cloudflareToken);
 	try {
 		const zone = await upsertZone(DIR);
 		if (!zone) throw new Error('Zone is not exists');
@@ -111,7 +140,7 @@ async function main() {
 					value: deploy,
 				},
 				{
-					name: 'Setup domain',
+					name: 'Setup website',
 					value: setup,
 				},
 				{
