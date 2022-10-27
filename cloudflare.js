@@ -59,10 +59,19 @@ export async function upsertRecord(zoneId, record) {
 		const { result } = await client.dnsRecords.browse(zoneId);
 
 		const recordName = record.name === '@' ? '' : record.name + '.';
-		const matchRecord = result.find(item => item.type === record.type && item.name === recordName + item.zone_name);
+		const matchRecord = findRecrod();
 		if (!matchRecord) return;
 
 		return await client.dnsRecords.edit(zoneId, matchRecord.id, record);
+
+		function findRecrod() {
+			const TYPE_RELATIVE = ['A', 'CNAME'];
+			return result.find(item => {
+				let isTypeMatch = TYPE_RELATIVE.includes(record.type) ? TYPE_RELATIVE.includes(item.type) : item.type === record.type;
+				let isNameMatch = item.name === recordName + item.zone_name;
+				return isTypeMatch && isNameMatch;
+			});
+		}
 	}
 }
 
